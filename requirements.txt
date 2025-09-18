@@ -1,0 +1,41 @@
+# Streamlit ISO Polar Plot Visualization Requirements
+
+# Core framework
+streamlit>=1.28.0
+
+# Data manipulation
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Visualization libraries
+matplotlib>=3.6.0
+plotly>=5.15.0
+
+# Scientific computing and interpolation
+scipy>=1.10.0
+
+# Image processing (for Gaussian filtering)
+# scipy already includes ndimage, so this is covered
+
+# Additional utilities
+# These are typically included with Python or covered by above packages:
+# - io (built-in)
+# - base64 (built-in)
+
+# Font support for Korean text (optional, for better Korean font rendering)
+# matplotlib already handles font fallback, but you might want to install additional fonts
+
+# Version constraints explanation:
+# - streamlit>=1.28.0: For latest features and stability
+# - pandas>=1.5.0: For reliable data manipulation and CSV handling
+# - numpy>=1.24.0: For numerical operations and array handling
+# - matplotlib>=3.6.0: For plotting and Korean font support
+# - plotly>=5.15.0: For interactive plots with latest features
+# - scipy>=1.10.0: For interpolation functions (RegularGridInterpolator, Rbf, griddata)
+
+# Optional: For better Korean font support on some systems
+# matplotlib-fontconfig>=0.1.0
+
+# Development dependencies (uncomment if needed for development)
+# jupyter>=1.0.0
+# ipython>=8.0.0
