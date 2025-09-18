@@ -645,6 +645,70 @@ def create_cross_section_csv_data(df_long, cross_direction):
         # 에러 시 빈 DataFrame 반환
         return pd.DataFrame({'Error': [f'CSV 생성 실패: {str(e)}']})
 
+def create_cross_section_plots(df_long, cross_direction):
+    """Matplotlib로 크로스섹션 플롯 생성 - PNG 저장용"""
+    
+    try:
+        fig, ax = plt.subplots(figsize=(12, 8))
+        
+        if cross_direction == "가로 (0°-180°)":
+            df_0 = df_long[df_long['Phi'] == 0].copy()
+            df_180 = df_long[df_long['Phi'] == 180].copy()
+            
+            if df_0.empty:
+                closest_phi = df_long['Phi'].iloc[(df_long['Phi'] - 0).abs().argsort()[:1]].values[0]
+                df_0 = df_long[df_long['Phi'] == closest_phi].copy()
+            if df_180.empty:
+                closest_phi = df_long['Phi'].iloc[(df_long['Phi'] - 180).abs().argsort()[:1]].values[0]
+                df_180 = df_long[df_long['Phi'] == closest_phi].copy()
+            
+            df_0 = df_0.sort_values('Theta')
+            df_180 = df_180.sort_values('Theta')
+            
+            ax.plot(df_0['Theta'], df_0['Luminance'], 'r-o', linewidth=3, markersize=8, 
+                   label='0° direction (우측)')
+            ax.plot(df_180['Theta'], df_180['Luminance'], 'b-s', linewidth=3, markersize=8, 
+                   label='180° direction (좌측)')
+            
+        elif cross_direction == "세로 (90°-270°)":
+            # 비슷한 로직으로 90도, 270도 처리
+            pass
+            
+        elif cross_direction == "대각선1 (45°-225°)":
+            df_45 = df_long[df_long['Phi'] == 45].copy()
+            df_225 = df_long[df_long['Phi'] == 225].copy()
+            
+            if df_45.empty:
+                closest_phi = df_long['Phi'].iloc[(df_long['Phi'] - 45).abs().argsort()[:1]].values[0]
+                df_45 = df_long[df_long['Phi'] == closest_phi].copy()
+            if df_225.empty:
+                closest_phi = df_long['Phi'].iloc[(df_long['Phi'] - 225).abs().argsort()[:1]].values[0]
+                df_225 = df_long[df_long['Phi'] == closest_phi].copy()
+            
+            df_45 = df_45.sort_values('Theta')
+            df_225 = df_225.sort_values('Theta')
+            
+            ax.plot(df_45['Theta'], df_45['Luminance'], color='orange', marker='o', linewidth=3, 
+                   label='45° direction (우상단)')
+            ax.plot(df_225['Theta'], df_225['Luminance'], color='purple', marker='s', linewidth=3, 
+                   label='225° direction (좌하단)')
+            
+        else:  # 대각선2 (135°-315°)
+            # 135도, 315도 처리
+            pass
+        
+        ax.set_title(f"크로스섹션: {cross_direction}", fontsize=16)
+        ax.set_xlabel('Theta (degrees)', fontsize=14)
+        ax.set_ylabel('Luminance', fontsize=14)
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=12)
+        plt.tight_layout()
+        return fig
+        
+    except Exception as e:
+        st.error(f"Matplotlib 크로스섹션 생성 중 오류: {str(e)}")
+        return plt.figure()
+
 def save_plotly_as_html(fig, filename):
     """Plotly 그래프를 HTML로 저장"""
     try:
@@ -662,7 +726,63 @@ def save_plotly_as_html(fig, filename):
         </html>
         """
         return error_html.encode()
+def get_box_corner_luminance(df_long):
+    """사각 박스 모서리 부분의 휘도 값을 추출하는 함수"""
+    box_data = {
+        'P_A+': [(11.60, 149.2), (11.60, 30.8), (20.29, 61.5), (20.29, 118.5)],
+        'P_A': [(20.0, 180.0), (20, 0), (34.31, 57.8), (34.31, 122)],
+        'D_A+': [(55.07, 4.2), (55.68, 12.8), (46.44, 18), (45.16, 6)],
+        'D_A': [(60.00, 0), (61.29, 18.4), (45.53, 34.5), (40, 0)]
+    }
+    
+    box_luminance = {}
+    for box_name, corners in box_data.items():
+        luminance_values = []
+        for theta, phi in corners:
+            # 가장 가까운 데이터 포인트 찾기
+            distances = []
+            for _, row in df_long.iterrows():
+                theta_diff = abs(row['Theta'] - theta)
+                phi_diff = min(abs(row['Phi'] - phi), 360 - abs(row['Phi'] - phi))
+                distance = np.sqrt(theta_diff**2 + phi_diff**2)
+                distances.append((distance, row['Luminance']))
+            
+            if distances:
+                closest_luminance = min(distances, key=lambda x: x[0])[1]
+                luminance_values.append(closest_luminance)
+        
+        if luminance_values:
+            box_luminance[box_name] = {
+                'min': min(luminance_values),
+                'max': max(luminance_values),
+                'avg': np.mean(luminance_values)
+            }
+    
+    return box_luminance
 
+# Data Info 탭에서 사용
+with tab3:
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("데이터 미리보기")
+        st.dataframe(df_long.head(10))
+    
+    with col2:
+        st.subheader("통계 정보")
+        # 기존 통계 정보...
+        
+        # 박스 모서리 휘도 정보 추가
+        st.write("**박스 모서리 휘도 정보:**")
+        box_luminance = get_box_corner_luminance(df_long)
+        if box_luminance:
+            box_df = pd.DataFrame({
+                'Box': list(box_luminance.keys()),
+                '최소값': [f"{info['min']:.2f}" for info in box_luminance.values()],
+                '최대값': [f"{info['max']:.2f}" for info in box_luminance.values()],
+                '평균값': [f"{info['avg']:.2f}" for info in box_luminance.values()]
+            })
+            st.dataframe(box_df, hide_index=True)
 def save_matplotlib_as_png(fig):
     """Matplotlib 그래프를 PNG 바이트로 저장"""
     try:
@@ -681,6 +801,49 @@ def save_matplotlib_as_png(fig):
         plt.close()
         img_buffer.seek(0)
         return img_buffer.getvalue()
+
+# 이 함수를 main 함수 위에 추가
+def get_box_corner_luminance(df_long):
+    """사각 박스 모서리 부분의 휘도 값을 추출하는 함수"""
+    try:
+        box_data = {
+            'P_A+': [(11.60, 149.2), (11.60, 30.8), (20.29, 61.5), (20.29, 118.5)],
+            'P_A': [(20.0, 180.0), (20, 0), (34.31, 57.8), (34.31, 122)],
+            'D_A+': [(55.07, 4.2), (55.68, 12.8), (46.44, 18), (45.16, 6)],
+            'D_A': [(60.00, 0), (61.29, 18.4), (45.53, 34.5), (40, 0)]
+        }
+        
+        box_luminance = {}
+        
+        for box_name, corners in box_data.items():
+            luminance_values = []
+            
+            for theta, phi in corners:
+                phi_converted = (phi + 180) % 360
+                
+                distances = []
+                for _, row in df_long.iterrows():
+                    theta_diff = abs(row['Theta'] - theta)
+                    phi_diff = min(abs(row['Phi'] - phi_converted), 360 - abs(row['Phi'] - phi_converted))
+                    distance = np.sqrt(theta_diff**2 + phi_diff**2)
+                    distances.append((distance, row['Luminance']))
+                
+                if distances:
+                    closest_luminance = min(distances, key=lambda x: x[0])[1]
+                    luminance_values.append(closest_luminance)
+            
+            if luminance_values:
+                box_luminance[box_name] = {
+                    'min': min(luminance_values),
+                    'max': max(luminance_values),
+                    'avg': np.mean(luminance_values)
+                }
+        
+        return box_luminance
+        
+    except Exception as e:
+        st.warning(f"박스 모서리 휘도 계산 중 오류: {str(e)}")
+        return {}
 
 def main():
     st.title("📊 Enhanced ISO Polar Plot Visualization")
@@ -715,6 +878,28 @@ def main():
             st.sidebar.write(f"**Luminance 범위:** {data_min:.2f} - {data_max:.2f}")
 
             st.sidebar.divider()
+
+             # 크로스섹션 설정 - 4가지 방향으로 확장
+            st.sidebar.subheader("✂️ 크로스섹션 설정")
+            
+            cross_direction = st.sidebar.selectbox(
+                "크로스섹션 방향",
+                ["가로 (0°-180°)", "세로 (90°-270°)", "대각선1 (45°-225°)", "대각선2 (135°-315°)"],
+                help="가로: 0°-180°, 세로: 90°-270°, 대각선1: 45°-225°, 대각선2: 135°-315°"
+            )
+            
+            # 선택된 방향에 따른 정보 표시 - 4가지 경우로 확장
+            if cross_direction == "가로 (0°-180°)":
+                st.sidebar.info("💡 가로 방향: 0°(우측)과 180°(좌측) 방향의 휘도 프로파일")
+            elif cross_direction == "세로 (90°-270°)":
+                st.sidebar.info("💡 세로 방향: 90°(상단)과 270°(하단) 방향의 휘도 프로파일")
+            elif cross_direction == "대각선1 (45°-225°)":
+                st.sidebar.info("💡 대각선1 방향: 45°(우상단)과 225°(좌하단) 방향의 휘도 프로파일")
+            else:
+                st.sidebar.info("💡 대각선2 방향: 135°(좌상단)과 315°(우하단) 방향의 휘도 프로파일")
+
+
+            
 
             # 컬러바 범위 설정
             st.sidebar.subheader("🎨 컬러바 설정")
@@ -752,9 +937,9 @@ def main():
             st.sidebar.subheader("✂️ 크로스섹션 설정")
             
             cross_direction = st.sidebar.selectbox(
-                "크로스섹션 방향",
-                ["가로 (0°-180°)", "세로 (90°-270°)"],
-                help="가로: 0°-180° 방향으로 자른 휘도 프로파일, 세로: 90°-270° 방향으로 자른 휘도 프로파일"
+            "크로스섹션 방향",
+            ["가로 (0°-180°)", "세로 (90°-270°)", "대각선1 (45°-225°)", "대각선2 (135°-315°)"],
+            help="가로: 0°-180° 방향으로 자른 휘도 프로파일, 세로: 90°-270° 방향으로 자른 휘도 프로파일"
             )
             
             # 선택된 방향에 따른 정보 표시
@@ -853,7 +1038,7 @@ def main():
                 except Exception as e:
                     st.error(f"PNG 크로스섹션 생성 실패: {str(e)}")
 
-            with tab3:
+            with tab3:  # Data Info 탭 수정
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -864,7 +1049,7 @@ def main():
                     st.subheader("통계 정보")
                     st.write("**Luminance 통계:**")
                     stats_df = pd.DataFrame({
-                        '통계': ['최소값', '최대값', '평균', '표준편차', '중간값'],
+                        '통계': ['최솟값', '최댓값', '평균', '표준편차', '중간값'],
                         '값': [
                             f"{df_long['Luminance'].min():.2f}",
                             f"{df_long['Luminance'].max():.2f}",
@@ -874,6 +1059,20 @@ def main():
                         ]
                     })
                     st.dataframe(stats_df, hide_index=True)
+                    
+                    # 박스 모서리 휘도 정보 추가
+                    st.write("**박스 모서리 휘도 정보:**")
+                    box_luminance = get_box_corner_luminance(df_long)
+                    if box_luminance:
+                        box_df = pd.DataFrame({
+                            'Box': list(box_luminance.keys()),
+                            '최솟값': [f"{info['min']:.2f}" for info in box_luminance.values()],
+                            '최댓값': [f"{info['max']:.2f}" for info in box_luminance.values()],
+                            '평균값': [f"{info['avg']:.2f}" for info in box_luminance.values()]
+                        })
+                        st.dataframe(box_df, hide_index=True)
+                    else:
+                        st.info("박스 모서리 휘도 정보를 계산할 수 없습니다.")
                 
                 csv_data = df_long.to_csv(index=False).encode('utf-8')
                 st.download_button(
