@@ -726,63 +726,7 @@ def save_plotly_as_html(fig, filename):
         </html>
         """
         return error_html.encode()
-def get_box_corner_luminance(df_long):
-    """사각 박스 모서리 부분의 휘도 값을 추출하는 함수"""
-    box_data = {
-        'P_A+': [(11.60, 149.2), (11.60, 30.8), (20.29, 61.5), (20.29, 118.5)],
-        'P_A': [(20.0, 180.0), (20, 0), (34.31, 57.8), (34.31, 122)],
-        'D_A+': [(55.07, 4.2), (55.68, 12.8), (46.44, 18), (45.16, 6)],
-        'D_A': [(60.00, 0), (61.29, 18.4), (45.53, 34.5), (40, 0)]
-    }
-    
-    box_luminance = {}
-    for box_name, corners in box_data.items():
-        luminance_values = []
-        for theta, phi in corners:
-            # 가장 가까운 데이터 포인트 찾기
-            distances = []
-            for _, row in df_long.iterrows():
-                theta_diff = abs(row['Theta'] - theta)
-                phi_diff = min(abs(row['Phi'] - phi), 360 - abs(row['Phi'] - phi))
-                distance = np.sqrt(theta_diff**2 + phi_diff**2)
-                distances.append((distance, row['Luminance']))
-            
-            if distances:
-                closest_luminance = min(distances, key=lambda x: x[0])[1]
-                luminance_values.append(closest_luminance)
-        
-        if luminance_values:
-            box_luminance[box_name] = {
-                'min': min(luminance_values),
-                'max': max(luminance_values),
-                'avg': np.mean(luminance_values)
-            }
-    
-    return box_luminance
-
-# Data Info 탭에서 사용
-with tab3:
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("데이터 미리보기")
-        st.dataframe(df_long.head(10))
-    
-    with col2:
-        st.subheader("통계 정보")
-        # 기존 통계 정보...
-        
-        # 박스 모서리 휘도 정보 추가
-        st.write("**박스 모서리 휘도 정보:**")
-        box_luminance = get_box_corner_luminance(df_long)
-        if box_luminance:
-            box_df = pd.DataFrame({
-                'Box': list(box_luminance.keys()),
-                '최소값': [f"{info['min']:.2f}" for info in box_luminance.values()],
-                '최대값': [f"{info['max']:.2f}" for info in box_luminance.values()],
-                '평균값': [f"{info['avg']:.2f}" for info in box_luminance.values()]
-            })
-            st.dataframe(box_df, hide_index=True)
+ 
 def save_matplotlib_as_png(fig):
     """Matplotlib 그래프를 PNG 바이트로 저장"""
     try:
